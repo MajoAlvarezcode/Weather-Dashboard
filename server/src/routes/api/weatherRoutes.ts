@@ -5,22 +5,16 @@ const router = Router();
 import HistoryService from '../../service/historyService.js';
 // import WeatherService from '../../service/weatherService.js';
 import WeatherService from '../../service/weatherService.js';
-
 // TODO: POST Request with city name to retrieve weather data
 router.post('/', async (req: Request, res: Response) => {
-  // TODO: GET weather data from city name
-  // TODO: save city to search history
   try {
-    const { city } = req.body;
-    if (!city) {
+    const { cityName } = req.body;
+    if (!cityName) {
       return res.status(400).json({ error: 'City name is required.' });
     }
 
-    // Obtener datos del clima
-    const weatherData = await WeatherService.getWeatherByCity(city);
-
-    // Guardar ciudad en el historial
-    await HistoryService.addCity(city);
+    // Llamar al método estático sin crear una instancia
+    const weatherData = await WeatherService.getWeatherForCity(cityName);
 
     return res.status(200).json({
       message: 'Weather data retrieved successfully.',
@@ -35,7 +29,7 @@ router.post('/', async (req: Request, res: Response) => {
 // TODO: GET search history
 router.get('/history', async (req: Request, res: Response) => {
   try {
-    const history = await HistoryService.getcities();
+    const history = await HistoryService.getCities();
     return res.status(200).json({ data: history });
   } catch (error) {
     console.error(error);
@@ -51,7 +45,7 @@ router.delete('/history/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'ID is required.' });
     }
 
-    await HistoryService.deletecity(id);
+    await HistoryService.deleteCity(req.params.id);
 
     return res.status(200).json({ message: 'City deleted from history.' });
   } catch (error) {
