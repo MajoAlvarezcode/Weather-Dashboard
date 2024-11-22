@@ -7,18 +7,6 @@ interface Coordinates {
   lon: number;
 }
 
-// Interface para la respuesta de la API
-interface WeatherAPIResponse {
-  list: {
-    dt: number;
-    dt_txt: string;
-    weather: { icon: string; description: string }[];
-    main: { temp: number; humidity: number };
-    wind: { speed: number };
-  }[];
-  city: { coord: Coordinates };
-}
-
 // Clase para encapsular los datos del clima
 class Weather {
   icon: string;
@@ -49,74 +37,85 @@ class Weather {
 }
 
 // Clase para el servicio de clima
-export class WeatherService {
+class WeatherService {
   baseURL: string;
   apiKey: string;
   cityName: string;
 
-  constructor(cityName: string = '') {
+  constructor(cityName?: string) {
     this.baseURL = process.env.API_BASE_URL || '';
     this.apiKey = process.env.API_KEY || '';
-    this.cityName = cityName;
+    this.cityName = cityName || '';
   }
 
-  // Método para construir la consulta de geocodificación
+  // Método para obtener datos de ubicación
+  private async fetchLocationData(query: string): Promise<any> {
+    try {
+      const response = await fetch(query);
+      const data = await response.json();
+      return data.city.coord; // Obtener solo las coordenadas
+    } catch (err) {
+      console.error('Error fetching location data: ', err);
+      throw new Error('Failed to fetch location data');
+    }
+  }
+
+  // Desestructuración de los datos de ubicación
+  private destructureLocationData(locationData: any): Coordinates {
+    const { lat, lon } = locationData; // Renombrar lat y lon para coincidir con las propiedades
+    return { lat, lon };
+  }
+
+  // Construir la consulta para geocodificación
   private buildGeocodeQuery(): string {
-    return `${this.baseURL}/geo/1.0/direct?q=${this.cityName}&appid=${this.apiKey}`;
+    return `${this.baseURL}/data/2.5/forecast?q=${this.cityName}&appid=${this.apiKey}`;
   }
 
-  // Método para construir la consulta del pronóstico
-  private buildForecastQuery(coordinates: Coordinates): string {
+  // Construir la consulta para obtener los datos del clima
+  private buildWeatherQuery(coordinates: Coordinates): string {
     const { lat, lon } = coordinates;
     return `${this.baseURL}/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${this.apiKey}`;
   }
 
-  // Método para obtener datos de ubicación desde la API
-  private async fetchLocationData(query: string): Promise<Coordinates> {
-    const response = await fetch(query);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch location data. Status: ${response.status}`);
-    }
-    const data: WeatherAPIResponse = await response.json();
-    return data.city.coord;
-  }
-
-  // Método para obtener y desestructurar los datos de ubicación
+  // Obtener las coordenadas de la ciudad
   private async fetchAndDestructureLocationData(): Promise<Coordinates> {
     const query = this.buildGeocodeQuery();
     const locationData = await this.fetchLocationData(query);
-    return locationData;
+    return this.destructureLocationData(locationData);
   }
 
-  // Método para obtener datos del clima desde la API
-  private async fetchWeatherData(coordinates: Coordinates): Promise<WeatherAPIResponse> {
-    const query = this.buildForecastQuery(coordinates);
-    const response = await fetch(query);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch weather data. Status: ${response.status}`);
+  // Obtener los datos del clima
+  private async fetchWeatherData(coordinates: Coordinates): Promise<any> {
+    try {
+      const weatherQuery = this.buildWeatherQuery(coordinates);
+      const weatherData = await fetch(weatherQuery);
+      return await weatherData.json();
+    } catch (err) {
+      console.error('Error fetching weather data: ', err);
+      throw new Error('Failed to fetch weather data');
     }
-    return await response.json();
   }
 
-  // Método para analizar el clima actual
-  private parseCurrentWeather(data: WeatherAPIResponse): Weather {
-    const icon = data.list[0].weather[0].icon;
-    const description = data.list[0].weather[0].description;
+  // Parsear los datos del clima actual
+  private parseCurrentWeather(data: any): Weather {
     const city = this.cityName;
     const date = new Date(data.list[0].dt * 1000).toLocaleDateString();
-    const temp = parseFloat(((data.list[0].main.temp - 273.15) * 9 / 5 + 32).toFixed(2));
+    const icon = data.list[0].weather[0].icon;
+    const description = data.list[0].weather[0].description;
+    const tempC = data.list[0].main.temp - 273.15; // Convertir de Kelvin a Celsius
+    const tempF = parseFloat((tempC * 9 / 5 + 32).toFixed(2)); // Convertir de Celsius a Fahrenheit
     const windSpeed = data.list[0].wind.speed;
     const humidity = data.list[0].main.humidity;
 
-    return new Weather(city, date, icon, description, temp, windSpeed, humidity);
+    return new Weather(city, date, icon, description, tempF, windSpeed, humidity);
   }
 
-  // Método para construir el array del pronóstico
-  private buildForecastArray(weatherData: WeatherAPIResponse): Weather[] {
+  // Construir el pronóstico del clima
+  private buildForecastArray(weatherData: any[]): Weather[] {
     const forecast: Weather[] = [];
     const uniqueDates: Set<string> = new Set();
 
-    weatherData.list.forEach((entry) => {
+    weatherData.forEach((entry: any) => {
       const date = entry.dt_txt.split(' ')[0];
       if (!uniqueDates.has(date) && uniqueDates.size < 5) {
         uniqueDates.add(date);
@@ -125,25 +124,34 @@ export class WeatherService {
         const formattedDate = new Date(entry.dt * 1000).toLocaleDateString();
         const icon = entry.weather[0].icon;
         const description = entry.weather[0].description;
-        const temp = parseFloat(((entry.main.temp - 273.15) * 9 / 5 + 32).toFixed(2));
+        const tempC = entry.main.temp - 273.15; // Convertir de Kelvin a Celsius
+        const tempF = parseFloat((tempC * 9 / 5 + 32).toFixed(2)); // Convertir de Celsius a Fahrenheit
         const windSpeed = entry.wind.speed;
         const humidity = entry.main.humidity;
 
-        forecast.push(new Weather(city, formattedDate, icon, description, temp, windSpeed, humidity));
+        forecast.push(new Weather(city, formattedDate, icon, description, tempF, windSpeed, humidity));
       }
     });
 
     return forecast;
   }
 
-  // Método público para obtener el clima y el pronóstico
-  static async getWeatherForCity(city: string): Promise<Weather[]> {
-    const instance = new WeatherService(city); // Crear instancia dentro del método estático
-    const coordinates = await instance.fetchAndDestructureLocationData();
-    const weatherData = await instance.fetchWeatherData(coordinates);
-    const currentWeather = instance.parseCurrentWeather(weatherData);
-    const forecast = instance.buildForecastArray(weatherData);
-    return [currentWeather, ...forecast];
+  // Obtener el clima para una ciudad
+  async getWeatherForCity(cityName: string): Promise<Weather[]> {
+    this.cityName = cityName;
+    try {
+      const coordinates = await this.fetchAndDestructureLocationData();
+      const weatherData = await this.fetchWeatherData(coordinates);
+      if (!weatherData || !weatherData.list || weatherData.list.length === 0) {
+        throw new Error('No weather data available');
+      }
+      const currentWeather = this.parseCurrentWeather(weatherData);
+      const forecast = this.buildForecastArray(weatherData.list);
+      return [currentWeather, ...forecast];
+    } catch (error) {
+      console.error('Error fetching weather data: ', error);
+      throw new Error('Failed to fetch weather data');
+    }
   }
 }
 
