@@ -1,6 +1,9 @@
 
 # Weather Dashboard
 
+## Link to deployed application
+https://weather-dashboard-g0ik.onrender.com/
+
 ## Table of Contents
 - [Description](#description)
 - [Installation](#installation)
