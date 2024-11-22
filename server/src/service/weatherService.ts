@@ -37,7 +37,7 @@ class Weather {
 }
 
 // Clase para el servicio de clima
-class WeatherService {
+export class WeatherService {
   baseURL: string;
   apiKey: string;
   cityName: string;
