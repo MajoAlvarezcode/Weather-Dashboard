@@ -13,7 +13,7 @@ class Weather {
     }
 }
 // Clase para el servicio de clima
-class WeatherService {
+export class WeatherService {
     constructor(cityName) {
         this.baseURL = process.env.API_BASE_URL || '';
         this.apiKey = process.env.API_KEY || '';
