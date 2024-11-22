@@ -2,9 +2,9 @@ import { Router, type Request, type Response } from 'express';
 const router = Router();
 
 // import HistoryService from '../../service/historyService.js';
-import HistoryService from '../../service/historyService.js';
+import HistoryService from '../../service/historyService';
 // import WeatherService from '../../service/weatherService.js';
-import WeatherService from '../../service/WeatherService.js'
+import WeatherService from '../../service/WeatherService'
 // TODO: POST Request with city name to retrieve weather data
 
 const weatherService = new WeatherService();
